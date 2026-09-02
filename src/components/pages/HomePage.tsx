@@ -26,6 +26,7 @@ import {
   Layers
 } from 'lucide-react';
 import { OccasionType, MenuItem } from '../../types';
+import { PremiumFoodBanner } from '../home/PremiumFoodBanner';
 
 export const HomePage: React.FC = () => {
   const {
@@ -175,7 +176,12 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. HOW ONLINE FOOD ORDERING WORKS (E-COMMERCE STEPS) */}
+      {/* 2. ANIMATED PREMIUM FOOD BANNER SHOWCASE */}
+      <section className="-mt-8 sm:-mt-12 relative z-20">
+        <PremiumFoodBanner />
+      </section>
+
+      {/* 3. HOW ONLINE FOOD ORDERING WORKS (E-COMMERCE STEPS) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-stone-950 rounded-3xl p-8 sm:p-12 text-white shadow-xl border border-emerald-800">
           <div className="text-center max-w-2xl mx-auto space-y-2 mb-8">
