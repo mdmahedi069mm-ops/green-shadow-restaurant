@@ -1,0 +1,6 @@
+{
+  "name": "The Green Shadow Restaurant",
+  "description": "The Green Shadow Restaurant — Rooftop dining, signature multi-cuisine menu, event hall for corporate AGMs, Walima, and family gatherings in Agrabad, Chattogram.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
