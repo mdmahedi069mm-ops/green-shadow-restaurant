@@ -19,6 +19,17 @@ import {
 } from 'lucide-react';
 import { MenuItem } from '../../types';
 
+const SIGNATURE_IMAGE_FALLBACKS: Record<string, string> = {
+  'item-1': 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85',
+  'item-2': 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=1200&q=85',
+  'item-7': 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1200&q=85',
+  'item-10': 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=1200&q=85',
+  'item-8': 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=1200&q=85',
+  'item-5': 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?auto=format&fit=crop&w=1200&q=85',
+};
+
+const DEFAULT_FOOD_IMAGE = 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85';
+
 export const PremiumFoodBanner: React.FC = () => {
   const {
     menuItems,
@@ -31,7 +42,7 @@ export const PremiumFoodBanner: React.FC = () => {
   // Curated Signature Selection for Executive Showcase
   const signatureDishes: MenuItem[] = React.useMemo(() => {
     // Select top signature dishes across categories
-    const preferredIds = ['item-1', 'item-10', 'item-8', 'item-2', 'item-22', 'item-14'];
+    const preferredIds = ['item-1', 'item-2', 'item-7', 'item-10', 'item-8', 'item-5'];
     const selected = menuItems.filter((m) => preferredIds.includes(m.id));
     if (selected.length > 0) return selected;
     return menuItems.filter((m) => m.isFeatured || m.isPopular).slice(0, 6);
@@ -43,6 +54,17 @@ export const PremiumFoodBanner: React.FC = () => {
 
   const activeDish = signatureDishes[currentIndex] || menuItems[0];
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Preload all signature dish images for instant switching
+  useEffect(() => {
+    signatureDishes.forEach((dish) => {
+      const url = dish.imageUrl || SIGNATURE_IMAGE_FALLBACKS[dish.id] || DEFAULT_FOOD_IMAGE;
+      if (url) {
+        const img = new Image();
+        img.src = url;
+      }
+    });
+  }, [signatureDishes]);
 
   // Smooth auto slide progression
   useEffect(() => {
@@ -97,10 +119,16 @@ export const PremiumFoodBanner: React.FC = () => {
               className="absolute inset-0"
             >
               <img
-                src={activeDish.imageUrl}
+                src={activeDish.imageUrl || SIGNATURE_IMAGE_FALLBACKS[activeDish.id] || DEFAULT_FOOD_IMAGE}
                 alt="Ambiance"
                 className="w-full h-full object-cover blur-3xl opacity-35 scale-125"
-                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  const fallback = SIGNATURE_IMAGE_FALLBACKS[activeDish.id] || DEFAULT_FOOD_IMAGE;
+                  if (target.src !== fallback) {
+                    target.src = fallback;
+                  }
+                }}
               />
             </motion.div>
           </AnimatePresence>
@@ -263,66 +291,69 @@ export const PremiumFoodBanner: React.FC = () => {
           </div>
 
           {/* Right Column: Gourmet Food Visual Presentation */}
-          <div className="lg:col-span-6 relative flex items-center justify-center min-h-[320px] sm:min-h-[400px]">
-            <div className="relative w-full max-w-[440px] aspect-square flex items-center justify-center">
+          <div className="lg:col-span-6 relative flex items-center justify-center w-full min-h-[280px] sm:min-h-[380px] lg:min-h-[440px]">
+            <div className="relative w-full max-w-[480px] aspect-[4/3] sm:aspect-square flex items-center justify-center">
               {/* Subtle Ambient Radial Glow */}
-              <div className="absolute inset-4 rounded-full bg-gradient-to-tr from-amber-500/20 via-emerald-600/15 to-transparent blur-2xl pointer-events-none" />
+              <div className="absolute inset-2 rounded-3xl bg-gradient-to-tr from-amber-500/25 via-emerald-600/20 to-transparent blur-2xl pointer-events-none" />
 
-              {/* Orbital Gold Rim Accent */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-                className="absolute inset-2 rounded-full border border-dashed border-amber-400/20 pointer-events-none"
-              />
-
-              {/* Main Gourmet Food Plate Presentation */}
+              {/* Main Gourmet Food Plate / Dish Presentation Frame */}
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`plate-${activeDish.id}`}
-                  initial={{ scale: 0.88, opacity: 0, y: 15 }}
-                  animate={{
-                    scale: 1,
-                    opacity: 1,
-                    y: [0, -8, 0]
-                  }}
-                  exit={{ scale: 0.88, opacity: 0, y: -15 }}
-                  transition={{
-                    scale: { duration: 0.6, ease: [0.16, 1, 0.3, 1] },
-                    opacity: { duration: 0.4 },
-                    y: { duration: 5, repeat: Infinity, ease: 'easeInOut' }
-                  }}
-                  className="relative z-10 w-[280px] h-[280px] sm:w-[360px] sm:h-[360px] rounded-full p-3.5 bg-gradient-to-b from-stone-800 to-stone-900 border-4 border-amber-400/40 shadow-2xl shadow-black/80"
+                  initial={{ opacity: 0.9, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0.9, scale: 0.98 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="relative z-10 w-full h-full rounded-2xl sm:rounded-3xl p-2 sm:p-2.5 bg-gradient-to-b from-amber-400/40 via-stone-800/90 to-stone-900 border-2 border-amber-400/50 shadow-2xl shadow-black/90 flex items-center justify-center"
                 >
-                  <div className="w-full h-full rounded-full overflow-hidden relative shadow-inner">
+                  <div className="w-full h-full rounded-xl sm:rounded-2xl overflow-hidden relative shadow-inner bg-stone-900">
                     <img
-                      src={activeDish.imageUrl}
+                      key={`img-${activeDish.id}`}
+                      src={activeDish.imageUrl || SIGNATURE_IMAGE_FALLBACKS[activeDish.id] || DEFAULT_FOOD_IMAGE}
                       alt={activeDish.nameEn}
-                      className="w-full h-full object-cover scale-105 hover:scale-110 transition-transform duration-700"
-                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover object-center scale-100 hover:scale-105 transition-transform duration-700"
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        const fallback = SIGNATURE_IMAGE_FALLBACKS[activeDish.id] || DEFAULT_FOOD_IMAGE;
+                        if (target.src !== fallback) {
+                          target.src = fallback;
+                        }
+                      }}
                     />
-                    {/* Glass Sheen Light Reflection */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20 pointer-events-none rounded-full" />
+
+                    {/* Subtle Luxury Gradient Overlay for Depth & Contrast */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950/75 via-transparent to-transparent pointer-events-none" />
+
+                    {/* Subtle Glass Sheen Light Reflection */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
+
+                    {/* In-Card Dish Title Overlay */}
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white pointer-events-none z-20">
+                      <div className="bg-stone-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/10 shadow-lg">
+                        <span className="text-xs sm:text-sm font-bold font-serif text-amber-300">
+                          {language === 'bn' && activeDish.nameBn ? activeDish.nameBn : activeDish.nameEn}
+                        </span>
+                      </div>
+                      <div className="bg-amber-400 text-stone-950 font-mono font-black text-xs sm:text-sm px-3 py-1 rounded-xl shadow-lg">
+                        ৳{activeDish.price}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Floating Luxury Tag: 100% Halal */}
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-                    className="absolute -top-2 -right-2 bg-emerald-900/95 border border-emerald-500 text-emerald-200 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md"
-                  >
+                  <div className="absolute -top-2.5 -right-2 sm:-top-3 sm:-right-3 bg-emerald-950/95 border border-emerald-500 text-emerald-200 px-3 py-1.5 rounded-full text-xs font-bold shadow-xl flex items-center gap-1.5 backdrop-blur-md z-20">
                     <ShieldCheck className="w-4 h-4 text-emerald-300" />
                     <span>100% Halal</span>
-                  </motion.div>
+                  </div>
 
                   {/* Floating Luxury Tag: Rooftop Fresh */}
-                  <motion.div
-                    animate={{ y: [0, 5, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
-                    className="absolute -bottom-3 left-2 bg-stone-900/95 border border-amber-400/60 text-amber-300 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md"
-                  >
+                  <div className="absolute -bottom-2.5 left-3 sm:-bottom-3 sm:left-4 bg-stone-900/95 border border-amber-400/60 text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-xl flex items-center gap-1.5 backdrop-blur-md z-20">
                     <Sparkles className="w-4 h-4 text-amber-400" />
                     <span>Rooftop Fresh</span>
-                  </motion.div>
+                  </div>
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -347,10 +378,17 @@ export const PremiumFoodBanner: React.FC = () => {
                 }`}
               >
                 <img
-                  src={dish.imageUrl}
+                  src={dish.imageUrl || SIGNATURE_IMAGE_FALLBACKS[dish.id] || DEFAULT_FOOD_IMAGE}
                   alt={dish.nameEn}
-                  className="w-6 h-6 rounded-lg object-cover"
-                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 rounded-lg object-cover shrink-0"
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    const fallback = SIGNATURE_IMAGE_FALLBACKS[dish.id] || DEFAULT_FOOD_IMAGE;
+                    if (target.src !== fallback) {
+                      target.src = fallback;
+                    }
+                  }}
                 />
                 <span className="truncate max-w-[130px] sm:max-w-[150px]">
                   {dish.nameEn}

@@ -251,7 +251,25 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ITEMS);
-    return saved ? JSON.parse(saved) : INITIAL_MENU_ITEMS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with INITIAL_MENU_ITEMS to guarantee imageUrl is valid and not empty
+          return parsed.map((item: MenuItem) => {
+            const defaultItem = INITIAL_MENU_ITEMS.find((init) => init.id === item.id);
+            return {
+              ...defaultItem,
+              ...item,
+              imageUrl: item.imageUrl && item.imageUrl.trim() !== '' ? item.imageUrl : defaultItem?.imageUrl || ''
+            };
+          });
+        }
+      } catch (e) {
+        console.error('Error parsing stored menu items', e);
+      }
+    }
+    return INITIAL_MENU_ITEMS;
   });
 
   const [reservations, setReservations] = useState<Reservation[]>(() => {
