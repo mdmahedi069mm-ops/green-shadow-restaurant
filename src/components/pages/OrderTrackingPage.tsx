@@ -18,6 +18,8 @@ import {
   ChevronRight,
   AlertCircle
 } from 'lucide-react';
+import { subscribeToOrder } from '../../services/orderService';
+import type { Order } from '../../types';
 
 export const OrderTrackingPage: React.FC = () => {
   const {
@@ -31,8 +33,22 @@ export const OrderTrackingPage: React.FC = () => {
     language
   } = useRestaurant();
 
+  const [liveOrder, setLiveOrder] = useState<Order | null>(null);
+  const targetOrderId = activeTrackingOrderId || orders[0]?.id;
+
+  // Real-time Firestore live order listener
+  useEffect(() => {
+    if (!targetOrderId) return;
+    const unsub = subscribeToOrder(targetOrderId, (updated) => {
+      if (updated) {
+        setLiveOrder(updated);
+      }
+    });
+    return () => unsub();
+  }, [targetOrderId]);
+
   // Find the selected order or fallback to first order
-  const order = orders.find((o) => o.id === activeTrackingOrderId) || orders[0];
+  const order = liveOrder || orders.find((o) => o.id === activeTrackingOrderId) || orders[0];
 
   const [ratingInput, setRatingInput] = useState<number>(5);
   const [reviewTextInput, setReviewTextInput] = useState<string>('');

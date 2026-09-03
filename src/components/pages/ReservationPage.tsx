@@ -37,15 +37,15 @@ export const ReservationPage: React.FC = () => {
   const [submittedReservation, setSubmittedReservation] = useState<Reservation | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) {
       return;
     }
 
     setSubmitting(true);
-    setTimeout(() => {
-      const created = addReservation({
+    try {
+      const created = await addReservation({
         name: formData.name.trim(),
         phone: formData.phone.trim(),
         email: formData.email.trim() || undefined,
@@ -58,8 +58,11 @@ export const ReservationPage: React.FC = () => {
       });
 
       setSubmittedReservation(created);
+    } catch (err) {
+      console.error('Reservation submission error:', err);
+    } finally {
       setSubmitting(false);
-    }, 600);
+    }
   };
 
   const handleNewBooking = () => {

@@ -49,7 +49,8 @@ export const CheckoutPage: React.FC = () => {
     customerUser,
     addSavedAddress,
     setCurrentPage,
-    language
+    language,
+    showToast
   } = useRestaurant();
 
   // Payment states
@@ -120,17 +121,68 @@ export const CheckoutPage: React.FC = () => {
     if (res.success) setCouponInput('');
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
+    if (!mobileNumber.trim()) {
+      showToast(
+        language === 'bn'
+          ? 'অনুগ্রহ করে একটি সঠিক যোগাযোগ নম্বর প্রদান করুন'
+          : 'Please enter a contact phone number',
+        'warning'
+      );
+      return;
+    }
+
+    if (orderType === 'delivery') {
+      const activeAddress = deliveryAddress?.streetAddress?.trim() || newStreet?.trim();
+      if (!activeAddress) {
+        showToast(
+          language === 'bn'
+            ? 'অনুগ্রহ করে আপনার ডেলিভারি সড়ক ও বাড়ির ঠিকানা লিখুন'
+            : 'Please specify your street address for delivery',
+          'warning'
+        );
+        return;
+      }
+      if (!deliveryAddress && newStreet.trim()) {
+        const generatedAddr: DeliveryAddress = {
+          id: `addr-${Date.now()}`,
+          label: newLabel || 'Home',
+          streetAddress: newStreet.trim(),
+          area: selectedDeliveryArea,
+          contactPhone: newContactPhone || mobileNumber || '01812-345678',
+          recipientName: customerUser?.name || 'Valued Guest'
+        };
+        addSavedAddress(generatedAddr);
+        setDeliveryAddress(generatedAddr);
+      }
+    }
+
+    if (orderType === 'dine-in' && !dineInTable.trim()) {
+      showToast(
+        language === 'bn'
+          ? 'অনুগ্রহ করে আপনার টেবিল বা রুফটপ ক্যাবানা নম্বর নির্বাচন করুন'
+          : 'Please specify your Rooftop Table or Cabana number for Dine-in',
+        'warning'
+      );
+      return;
+    }
+
     setIsSubmitting(true);
-    setTimeout(() => {
-      const order = placeOrder(paymentMethod, {
+    try {
+      await placeOrder(paymentMethod, {
         mobileNumber,
         cardDetails: { last4: cardNumber.slice(-4), cardBrand: 'Visa' },
         transactionId: paymentMethod !== 'cod' ? `TRX-${Date.now().toString().slice(-8)}` : undefined
       });
       setIsSubmitting(false);
       setCurrentPage('tracking');
-    }, 1200);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      showToast(
+        err?.message || (language === 'bn' ? 'অর্ডার প্রক্রিয়া করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।' : 'Failed to place order. Please try again.'),
+        'error'
+      );
+    }
   };
 
   const currentAreaMatch = CHATTOGRAM_DELIVERY_AREAS.find((a) => a.area === selectedDeliveryArea);
@@ -305,19 +357,21 @@ export const CheckoutPage: React.FC = () => {
                   )}
 
                   {/* Add new address inline form */}
-                  {isAddingNewAddress && (
+                  {(!customerUser || !customerUser.savedAddresses || customerUser.savedAddresses.length === 0 || isAddingNewAddress) && (
                     <form onSubmit={handleAddNewAddressSubmit} className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-stone-800">
-                          {language === 'bn' ? 'নতুন ডেলিভারি ঠিকানা যোগ করুন' : 'Add New Delivery Address'}
+                          {language === 'bn' ? 'ডেলিভারির ঠিকানা লিখুন' : 'Delivery Address'}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingNewAddress(false)}
-                          className="text-xs text-stone-500 hover:text-stone-800"
-                        >
-                          Cancel
-                        </button>
+                        {customerUser && customerUser.savedAddresses && customerUser.savedAddresses.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingNewAddress(false)}
+                            className="text-xs text-stone-500 hover:text-stone-800"
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <input

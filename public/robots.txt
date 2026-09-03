@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /checkout
+Disallow: /tracking
+Disallow: /profile
+
+Sitemap: https://thegreenshadow.com/sitemap.xml

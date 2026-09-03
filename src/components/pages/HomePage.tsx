@@ -296,6 +296,9 @@ export const HomePage: React.FC = () => {
                   alt={dish.nameEn}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80';
+                  }}
                 />
                 <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
                   <span className="px-3 py-1 bg-stone-950/85 backdrop-blur-md text-amber-300 text-xs font-bold rounded-lg border border-stone-700 font-mono">

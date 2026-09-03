@@ -23,6 +23,7 @@ import { DishCustomizerModal } from './components/menu/DishCustomizerModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { DishDetailModal, LightboxModal } from './components/ui/Modals';
+import { SEOHead } from './components/seo/SEOHead';
 
 const AppContent: React.FC = () => {
   const { currentPage } = useRestaurant();
@@ -73,6 +74,9 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans selection:bg-emerald-900 selection:text-amber-300">
+      {/* Dynamic SEO Meta & Title Manager */}
+      <SEOHead />
+
       {/* Top Header */}
       <Header />
 

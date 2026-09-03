@@ -40,6 +40,38 @@ import {
   INITIAL_ORDERS,
   CHATTOGRAM_DELIVERY_AREAS
 } from '../data/initialData';
+import { checkFirebaseConfig, isFirebaseActive } from '../firebase/config';
+import {
+  createOrder as serviceCreateOrder,
+  subscribeToAllOrders,
+  updateOrderStatus as serviceUpdateOrderStatus,
+  submitOrderRating as serviceSubmitOrderRating,
+  getLocalOrders
+} from '../services/orderService';
+import {
+  createReservation as serviceCreateReservation,
+  subscribeToReservations,
+  updateReservationStatus as serviceUpdateReservationStatus,
+  getLocalReservations
+} from '../services/reservationService';
+import {
+  createEventInquiry as serviceCreateEventInquiry,
+  subscribeToEventInquiries,
+  updateEventInquiryStatus as serviceUpdateEventInquiryStatus,
+  getLocalEvents
+} from '../services/eventService';
+import {
+  subscribeToMenuItems,
+  updateMenuItemAvailability as serviceUpdateMenuItemAvailability,
+  getLocalMenuItems
+} from '../services/menuService';
+import {
+  loginAdmin as serviceLoginAdmin,
+  createAdminAccount as serviceCreateAdminAccount,
+  logoutAdmin as serviceLogoutAdmin,
+  subscribeToAdminAuth,
+  getLocalAdminUser
+} from '../services/authService';
 
 export type PageId =
   | 'home'
@@ -176,7 +208,7 @@ interface RestaurantContextType {
   placeOrder: (
     paymentMethod: PaymentMethod,
     paymentMeta?: { mobileNumber?: string; cardDetails?: any; transactionId?: string }
-  ) => Order;
+  ) => Promise<Order> | Order;
   reorder: (order: Order) => void;
   cancelOrder: (orderId: string, reason?: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => void;
@@ -193,8 +225,11 @@ interface RestaurantContextType {
   // ----------------- ADMIN AUTH & CONTROLS -----------------
   isAdminLoggedIn: boolean;
   adminUser: AdminUser | null;
-  adminLogin: (email: string, pass: string) => boolean;
+  adminLogin: (email: string, pass: string) => Promise<boolean> | boolean;
+  adminRegister: (email: string, pass: string, name?: string) => Promise<boolean> | boolean;
   adminLogout: () => void;
+  isFirebaseConfigured: boolean;
+  firebaseStatus: { isConfigured: boolean; missingKeys: string[]; projectId?: string };
 
   // Active Modals
   selectedDish: MenuItem | null;
@@ -234,8 +269,78 @@ const STORAGE_KEYS = {
   COUPONS: 'greenshadow_coupons'
 };
 
+export const getPageFromLocation = (): PageId => {
+  if (typeof window === 'undefined') return 'home';
+
+  let path = window.location.pathname.replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+  if (!path && window.location.hash) {
+    path = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  }
+
+  switch (path) {
+    case '':
+    case 'home':
+      return 'home';
+    case 'menu':
+      return 'menu';
+    case 'reservation':
+    case 'reservations':
+    case 'book-table':
+    case 'reserve':
+      return 'reservation';
+    case 'events':
+    case 'event-booking':
+    case 'hall':
+      return 'events';
+    case 'gallery':
+    case 'photos':
+      return 'gallery';
+    case 'about':
+    case 'about-us':
+      return 'about';
+    case 'location':
+    case 'map':
+    case 'directions':
+      return 'location';
+    case 'reviews':
+    case 'ratings':
+    case 'testimonials':
+      return 'reviews';
+    case 'faq':
+    case 'faqs':
+    case 'help':
+      return 'faq';
+    case 'contact':
+    case 'contact-us':
+      return 'contact';
+    case 'privacy':
+    case 'privacy-policy':
+      return 'privacy';
+    case 'terms':
+    case 'terms-conditions':
+      return 'terms';
+    case 'admin':
+    case 'portal':
+    case 'operator':
+      return 'admin';
+    case 'checkout':
+    case 'cart':
+      return 'checkout';
+    case 'tracking':
+    case 'track':
+    case 'orders':
+    case 'order-tracking':
+      return 'tracking';
+    case 'profile':
+    case 'account':
+      return 'profile';
+    default:
+      return 'home';
+  }
+};
+
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentPage, setCurrentPageRaw] = useState<PageId>('home');
+  const [currentPage, setCurrentPageRaw] = useState<PageId>(() => getPageFromLocation());
   const [language, setLanguageState] = useState<Language>('en');
 
   // Core collections
@@ -330,23 +435,26 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const [specialOrderNotes, setSpecialOrderNotes] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
 
+  const [firebaseStatus] = useState(() => checkFirebaseConfig());
+  const isFirebaseConfigured = firebaseStatus.isConfigured;
+
   // ----------------- ORDERS STATE -----------------
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.ORDERS);
-    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
+    const saved = getLocalOrders();
+    return saved.length > 0 ? saved : INITIAL_ORDERS;
   });
-  const [activeTrackingOrderId, setActiveTrackingOrderId] = useState<string | null>('GS-9428');
+  const [activeTrackingOrderId, setActiveTrackingOrderId] = useState<string | null>(() => {
+    const local = getLocalOrders();
+    return local.length > 0 ? local[0].id : 'GS-9428';
+  });
 
   // ----------------- ADMIN AUTH -----------------
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH) === 'true';
+    return !!getLocalAdminUser();
   });
 
   const [adminUser, setAdminUser] = useState<AdminUser | null>(() => {
-    if (localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH) === 'true') {
-      return { id: 'usr-1', name: 'Manager / Operator', email: 'admin@thegreenshadow.com', role: 'admin' };
-    }
-    return null;
+    return getLocalAdminUser();
   });
 
   // UI Interactive Modals / Drawers
@@ -354,6 +462,65 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const [customizerItem, setCustomizerItem] = useState<MenuItem | null>(null);
   const [lightboxImage, setLightboxImage] = useState<GalleryImage | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // ----------------- REAL-TIME CLOUD / MULTI-DEVICE LISTENERS -----------------
+  // 1. Live Orders Subscription (Customer & Admin real-time cross-device sync)
+  useEffect(() => {
+    let prevOrdersCount = orders.length;
+    const unsub = subscribeToAllOrders((liveOrders) => {
+      if (liveOrders && liveOrders.length > 0) {
+        setOrders(liveOrders);
+        if (liveOrders.length > prevOrdersCount) {
+          const newest = liveOrders[0];
+          if (newest && newest.status === 'placed') {
+            playKitchenChime();
+            showToast(`🔔 New Order #${newest.id} received from ${newest.customerName}!`, 'info');
+          }
+        }
+        prevOrdersCount = liveOrders.length;
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 2. Live Reservations Subscription
+  useEffect(() => {
+    const unsub = subscribeToReservations((liveRes) => {
+      if (liveRes && liveRes.length > 0) {
+        setReservations(liveRes);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 3. Live Event Inquiries Subscription
+  useEffect(() => {
+    const unsub = subscribeToEventInquiries((liveEvents) => {
+      if (liveEvents && liveEvents.length > 0) {
+        setEventInquiries(liveEvents);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 4. Live Menu Inventory Subscription
+  useEffect(() => {
+    const unsub = subscribeToMenuItems(INITIAL_MENU_ITEMS, (liveItems) => {
+      if (liveItems && liveItems.length > 0) {
+        setMenuItems(liveItems);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 5. Live Staff Auth State Subscription
+  useEffect(() => {
+    const unsub = subscribeToAdminAuth((user) => {
+      setAdminUser(user);
+      setIsAdminLoggedIn(!!user);
+    });
+    return () => unsub();
+  }, []);
 
   // ----------------- LOCAL STORAGE SYNC -----------------
   useEffect(() => {
@@ -437,9 +604,25 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Synchronize browser history and back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const page = getPageFromLocation();
+      setCurrentPageRaw(page);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const setCurrentPage = (page: PageId) => {
     setCurrentPageRaw(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof window !== 'undefined') {
+      const targetPath = page === 'home' ? '/' : `/${page}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ page }, '', targetPath);
+      }
+    }
   };
 
   // Kitchen Sound Alert synthesizer
@@ -622,10 +805,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // ----------------- ORDERS MANAGEMENT -----------------
-  const placeOrder = (
+  const placeOrder = async (
     paymentMethod: PaymentMethod,
     paymentMeta?: { mobileNumber?: string; cardDetails?: any; transactionId?: string }
-  ): Order => {
+  ): Promise<Order> => {
     const orderId = `GS-${Math.floor(1000 + Math.random() * 9000)}`;
     const nowIso = new Date().toISOString();
 
@@ -688,7 +871,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       createdAt: nowIso
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
+    // Save to Firestore with local sync
+    await serviceCreateOrder(newOrder);
+
+    setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
     clearCart();
     setActiveTrackingOrderId(orderId);
     playKitchenChime();
@@ -712,84 +898,36 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     showToast(`Items from order #${order.id} added to cart`, 'success');
   };
 
-  const cancelOrder = (orderId: string, reason = 'Customer request') => {
+  const cancelOrder = async (orderId: string, reason = 'Customer request') => {
+    await serviceUpdateOrderStatus(orderId, 'cancelled', reason);
     setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.id === orderId) {
-          const now = new Date().toISOString();
-          return {
-            ...ord,
-            status: 'cancelled',
-            timeline: [
-              ...ord.timeline,
-              {
-                status: 'cancelled',
-                timestamp: now,
-                titleEn: 'Order Cancelled',
-                titleBn: 'অর্ডার বাতিল করা হয়েছে',
-                note: reason
-              }
-            ]
-          };
-        }
-        return ord;
-      })
+      prev.map((ord) => (ord.id === orderId ? { ...ord, status: 'cancelled' } : ord))
     );
     showToast(`Order #${orderId} has been cancelled`, 'info');
   };
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus, note?: string) => {
-    const statusTitlesEn: Record<OrderStatus, string> = {
-      placed: 'Order Placed',
-      confirmed: 'Order Confirmed by Restaurant',
-      preparing: 'Kitchen Cooking & Preparing',
-      out_for_delivery: 'Rider Dispatched for Delivery',
-      ready_for_pickup: 'Order Ready at Rooftop Counter',
-      delivered: 'Order Delivered Successfully',
-      completed: 'Order Completed',
-      cancelled: 'Order Cancelled'
-    };
+  const updateOrderStatus = async (orderId: string, status: OrderStatus, note?: string) => {
+    let driverUpdate: DriverInfo | undefined = undefined;
+    const currentOrder = orders.find((o) => o.id === orderId);
+    if (status === 'out_for_delivery' && (!currentOrder || !currentOrder.driver)) {
+      driverUpdate = {
+        name: 'Rashedul Islam',
+        phone: '01822-445566',
+        vehicleNumber: 'Ctg Metro-Ha 44-1290 (Honda)',
+        photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+        rating: 4.9,
+        currentLocationPercent: 35
+      };
+    }
 
-    const statusTitlesBn: Record<OrderStatus, string> = {
-      placed: 'অর্ডার গ্রহণ করা হয়েছে',
-      confirmed: 'রেস্টুরেন্ট থেকে কনফার্ম করা হয়েছে',
-      preparing: 'রান্নাঘরে প্রস্তুত হচ্ছে',
-      out_for_delivery: 'রাইডার ডেলিভারির জন্য রওনা হয়েছেন',
-      ready_for_pickup: 'পিকআপের জন্য প্রস্তুত',
-      delivered: 'ডেলিভারি সম্পন্ন হয়েছে',
-      completed: 'অর্ডার সম্পন্ন',
-      cancelled: 'অর্ডার বাতিল করা হয়েছে'
-    };
-
+    await serviceUpdateOrderStatus(orderId, status, note, driverUpdate);
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
-          const now = new Date().toISOString();
-          let driverUpdate = ord.driver;
-          if (status === 'out_for_delivery' && !driverUpdate) {
-            driverUpdate = {
-              name: 'Rashedul Islam',
-              phone: '01822-445566',
-              vehicleNumber: 'Ctg Metro-Ha 44-1290 (Honda)',
-              photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-              rating: 4.9,
-              currentLocationPercent: 35
-            };
-          }
           return {
             ...ord,
             status,
-            driver: driverUpdate,
-            timeline: [
-              ...ord.timeline,
-              {
-                status,
-                timestamp: now,
-                titleEn: statusTitlesEn[status] || status,
-                titleBn: statusTitlesBn[status] || status,
-                note: note || `Updated by restaurant management`
-              }
-            ]
+            driver: driverUpdate || ord.driver
           };
         }
         return ord;
@@ -798,7 +936,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     showToast(`Order #${orderId} status changed to ${status}`, 'info');
   };
 
-  const assignDriver = (orderId: string, driver: DriverInfo) => {
+  const assignDriver = async (orderId: string, driver: DriverInfo) => {
+    await serviceUpdateOrderStatus(orderId, 'out_for_delivery', `Assigned to rider ${driver.name}`, driver);
     setOrders((prev) =>
       prev.map((ord) => (ord.id === orderId ? { ...ord, driver } : ord))
     );
@@ -821,7 +960,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  const rateOrder = (orderId: string, rating: number, reviewText?: string) => {
+  const rateOrder = async (orderId: string, rating: number, reviewText?: string) => {
+    await serviceSubmitOrderRating(orderId, rating, reviewText);
     setOrders((prev) =>
       prev.map((ord) => (ord.id === orderId ? { ...ord, rating, reviewText } : ord))
     );
@@ -1008,47 +1148,52 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     showToast('Menu item removed', 'info');
   };
 
-  const toggleItemAvailability = (id: string) => {
-    setMenuItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, isAvailable: !i.isAvailable } : i))
-    );
+  const toggleItemAvailability = async (id: string) => {
     const current = menuItems.find((i) => i.id === id);
     const nextState = current ? !current.isAvailable : true;
+    await serviceUpdateMenuItemAvailability(id, nextState, menuItems);
+    setMenuItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, isAvailable: nextState } : i))
+    );
     showToast(nextState ? 'Item marked Available' : 'Item marked Currently Unavailable', 'info');
   };
 
-  const addReservation = (res: Omit<Reservation, 'id' | 'status' | 'createdAt'>): Reservation => {
+  const addReservation = async (res: Omit<Reservation, 'id' | 'status' | 'createdAt'>): Promise<Reservation> => {
     const newRes: Reservation = {
       ...res,
       id: `RES-${Math.floor(1000 + Math.random() * 9000)}`,
       status: 'Pending',
       createdAt: new Date().toISOString()
     };
-    setReservations((prev) => [newRes, ...prev]);
+    await serviceCreateReservation(newRes);
+    setReservations((prev) => [newRes, ...prev.filter((r) => r.id !== newRes.id)]);
     showToast('Reservation request submitted successfully!', 'success');
     return newRes;
   };
 
-  const updateReservationStatus = (id: string, status: ReservationStatus) => {
+  const updateReservationStatus = async (id: string, status: ReservationStatus) => {
+    await serviceUpdateReservationStatus(id, status);
     setReservations((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status } : r))
     );
     showToast(`Reservation #${id} marked as ${status}`, 'info');
   };
 
-  const addEventInquiry = (inq: Omit<EventInquiry, 'id' | 'status' | 'createdAt'>): EventInquiry => {
+  const addEventInquiry = async (inq: Omit<EventInquiry, 'id' | 'status' | 'createdAt'>): Promise<EventInquiry> => {
     const newInq: EventInquiry = {
       ...inq,
       id: `EVT-${Math.floor(500 + Math.random() * 4500)}`,
       status: 'Pending',
       createdAt: new Date().toISOString()
     };
-    setEventInquiries((prev) => [newInq, ...prev]);
+    await serviceCreateEventInquiry(newInq);
+    setEventInquiries((prev) => [newInq, ...prev.filter((e) => e.id !== newInq.id)]);
     showToast('Event inquiry submitted! Our event manager will contact you.', 'success');
     return newInq;
   };
 
-  const updateEventInquiryStatus = (id: string, status: ReservationStatus) => {
+  const updateEventInquiryStatus = async (id: string, status: ReservationStatus) => {
+    await serviceUpdateEventInquiryStatus(id, status);
     setEventInquiries((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status } : e))
     );
@@ -1105,30 +1250,36 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // ----------------- ADMIN LOGIN & LOGOUT -----------------
-  const adminLogin = (email: string, pass: string): boolean => {
-    if (
-      (email.trim().toLowerCase() === 'admin@thegreenshadow.com' && pass === 'admin123') ||
-      email.trim() === 'admin' ||
-      pass === 'admin'
-    ) {
+  const adminLogin = async (email: string, pass: string): Promise<boolean> => {
+    try {
+      const user = await serviceLoginAdmin(email, pass);
       setIsAdminLoggedIn(true);
-      setAdminUser({
-        id: 'usr-1',
-        name: 'Restaurant Operator',
-        email: email.includes('@') ? email : 'admin@thegreenshadow.com',
-        role: 'admin'
-      });
-      showToast('Logged into The Green Shadow Admin Dashboard', 'success');
+      setAdminUser(user);
+      showToast(`Welcome back, ${user.name}! Command Console ready.`, 'success');
       return true;
+    } catch (err: any) {
+      showToast(err.message || 'Invalid admin credentials', 'error');
+      return false;
     }
-    showToast('Invalid admin credentials. (Hint: admin@thegreenshadow.com / admin123)', 'error');
-    return false;
   };
 
-  const adminLogout = () => {
+  const adminRegister = async (email: string, pass: string, name?: string): Promise<boolean> => {
+    try {
+      const user = await serviceCreateAdminAccount(email, pass, name);
+      setIsAdminLoggedIn(true);
+      setAdminUser(user);
+      showToast(`Staff account registered! Welcome, ${user.name}.`, 'success');
+      return true;
+    } catch (err: any) {
+      showToast(err.message || 'Staff registration failed', 'error');
+      return false;
+    }
+  };
+
+  const adminLogout = async () => {
+    await serviceLogoutAdmin();
     setIsAdminLoggedIn(false);
     setAdminUser(null);
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
     showToast('Logged out of Admin Panel', 'info');
     if (currentPage === 'admin') {
       setCurrentPage('home');
@@ -1272,7 +1423,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         isAdminLoggedIn,
         adminUser,
         adminLogin,
+        adminRegister,
         adminLogout,
+        isFirebaseConfigured,
+        firebaseStatus,
 
         // Active Modals & UI
         selectedDish,

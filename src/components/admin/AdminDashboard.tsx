@@ -54,7 +54,10 @@ export const AdminDashboard: React.FC = () => {
     isAdminLoggedIn,
     adminUser,
     adminLogin,
+    adminRegister,
     adminLogout,
+    isFirebaseConfigured,
+    firebaseStatus,
     restaurantInfo,
     updateRestaurantInfo,
     menuCategories,
@@ -93,8 +96,11 @@ export const AdminDashboard: React.FC = () => {
   } = useRestaurant();
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('admin@thegreenshadow.com');
-  const [loginPassword, setLoginPassword] = useState('admin123');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [operatorName, setOperatorName] = useState('');
 
   // Active tab inside admin
   const [activeTab, setActiveTab] = useState<
@@ -161,6 +167,20 @@ export const AdminDashboard: React.FC = () => {
   const [settingsForm, setSettingsForm] = useState({ ...restaurantInfo });
 
   if (!isAdminLoggedIn) {
+    const handleLoginSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsLoggingIn(true);
+      try {
+        if (isRegisterMode) {
+          await adminRegister(loginEmail, loginPassword, operatorName.trim() || undefined);
+        } else {
+          await adminLogin(loginEmail, loginPassword);
+        }
+      } finally {
+        setIsLoggingIn(false);
+      }
+    };
+
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-stone-200 shadow-2xl space-y-6">
@@ -176,18 +196,44 @@ export const AdminDashboard: React.FC = () => {
             </p>
           </div>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              adminLogin(loginEmail, loginPassword);
-            }}
-            className="space-y-4 text-xs sm:text-sm"
-          >
+          {/* Real Backend Connection Badge */}
+          <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+            isFirebaseConfigured
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isFirebaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              <span className="font-semibold">
+                {isFirebaseConfigured ? 'Cloud Firestore & Firebase Auth' : 'Local Fallback Mode'}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-white/80 border border-stone-200">
+              {isFirebaseConfigured ? 'Connected' : 'Preview'}
+            </span>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs sm:text-sm">
+            {isRegisterMode && (
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Manager / Dispatcher Name"
+                  value={operatorName}
+                  onChange={(e) => setOperatorName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-800 text-xs"
+                />
+              </div>
+            )}
+
             <div>
-              <label className="block font-semibold text-stone-700 mb-1">Admin Email</label>
+              <label className="block font-semibold text-stone-700 mb-1">Staff Email Address</label>
               <input
-                type="text"
+                type="email"
                 required
+                placeholder="staff@thegreenshadow.com"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-800 text-xs"
@@ -199,6 +245,7 @@ export const AdminDashboard: React.FC = () => {
               <input
                 type="password"
                 required
+                placeholder="••••••••"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-800 text-xs"
@@ -207,24 +254,42 @@ export const AdminDashboard: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3 bg-emerald-950 hover:bg-emerald-900 text-amber-300 font-bold rounded-xl text-xs sm:text-sm shadow-md transition-colors"
+              disabled={isLoggingIn}
+              className="w-full py-3 bg-emerald-950 hover:bg-emerald-900 disabled:opacity-50 text-amber-300 font-bold rounded-xl text-xs sm:text-sm shadow-md transition-colors flex items-center justify-center gap-2"
             >
-              Sign In to Food Ordering & Kitchen Console
+              {isLoggingIn ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
+                  <span>{isRegisterMode ? 'Creating Account...' : 'Verifying Credentials...'}</span>
+                </>
+              ) : (
+                <span>
+                  {isRegisterMode
+                    ? 'Register & Activate Operator Account'
+                    : 'Sign In to Food Ordering & Kitchen Console'}
+                </span>
+              )}
             </button>
+
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => setIsRegisterMode(!isRegisterMode)}
+                className="text-xs text-emerald-800 hover:text-emerald-950 font-semibold underline underline-offset-2 transition-colors"
+              >
+                {isRegisterMode
+                  ? '← Already have staff credentials? Sign In'
+                  : 'New restaurant staff or fresh deployment? Register Account →'}
+              </button>
+            </div>
           </form>
 
-          {/* 1-Click Fast demo sign in */}
-          <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
-            <span className="font-bold block">Operator Credentials:</span>
-            <span className="text-stone-600 block">Email: <code>admin@thegreenshadow.com</code></span>
-            <span className="text-stone-600 block">Password: <code>admin123</code></span>
-            <button
-              type="button"
-              onClick={() => adminLogin('admin@thegreenshadow.com', 'admin123')}
-              className="w-full mt-2 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-amber-300 font-semibold rounded-lg text-xs transition-colors"
-            >
-              1-Click Instant Operator Sign-In
-            </button>
+          {/* Secure Staff Guidance */}
+          <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-600 space-y-1">
+            <span className="font-semibold text-stone-800 block">Staff Authentication Note:</span>
+            <p className="text-[11px] leading-relaxed text-stone-500">
+              Restaurant staff access is authenticated via Firebase Auth. Only authorized personnel may update order statuses, assign dispatch riders, and modify menu catalog availability.
+            </p>
           </div>
         </div>
       </div>
@@ -322,12 +387,20 @@ export const AdminDashboard: React.FC = () => {
             <ShieldCheck className="w-6 h-6 text-emerald-300" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold font-serif">
                 The Green Shadow Command Console
               </h1>
               <span className="px-2 py-0.5 bg-emerald-800 text-emerald-200 text-[10px] font-bold rounded-full">
                 Live Kitchen Active
+              </span>
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border flex items-center gap-1 ${
+                isFirebaseConfigured
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                  : 'bg-amber-950 text-amber-300 border-amber-700'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isFirebaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                {isFirebaseConfigured ? 'Cloud Firestore Realtime' : 'Local Sandbox Mode'}
               </span>
             </div>
             <p className="text-xs text-stone-400">
@@ -694,6 +767,25 @@ export const AdminDashboard: React.FC = () => {
                         </button>
                       )}
 
+                      {/* Direct Status Selector Dropdown */}
+                      <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+                        <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider hidden sm:inline">Status:</span>
+                        <select
+                          value={ord.status}
+                          onChange={(e) => updateOrderStatus(ord.id, e.target.value as OrderStatus, 'Status updated via Operator dropdown')}
+                          className="px-2.5 py-1.5 bg-stone-50 border border-stone-300 rounded-lg text-xs font-semibold text-stone-800 hover:bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-800"
+                        >
+                          <option value="placed">Placed</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="preparing">Preparing</option>
+                          <option value="ready_for_pickup">Ready for Pickup</option>
+                          <option value="out_for_delivery">Out for Delivery</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </div>
+
                       {ord.status !== 'cancelled' && ord.status !== 'delivered' && (
                         <button
                           type="button"
@@ -1034,14 +1126,18 @@ export const AdminDashboard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => toggleItemAvailability(item.id)}
-                    className="text-stone-600 hover:text-stone-900 font-semibold"
+                    className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors ${
+                      item.isAvailable
+                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
+                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    }`}
                   >
-                    Toggle Stock
+                    {item.isAvailable ? 'Mark as Sold Out' : 'Mark as Available'}
                   </button>
                   <button
                     type="button"
                     onClick={() => deleteMenuItem(item.id)}
-                    className="text-red-600 hover:text-red-700 font-semibold"
+                    className="text-stone-400 hover:text-red-600 font-semibold px-2 py-1 transition-colors"
                   >
                     Delete
                   </button>

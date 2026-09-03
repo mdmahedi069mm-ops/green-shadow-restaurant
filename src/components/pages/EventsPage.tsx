@@ -37,13 +37,13 @@ export const EventsPage: React.FC = () => {
   const [submittedInquiry, setSubmittedInquiry] = useState<EventInquiry | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) return;
 
     setSubmitting(true);
-    setTimeout(() => {
-      const created = addEventInquiry({
+    try {
+      const created = await addEventInquiry({
         name: formData.name.trim(),
         organization: formData.organization.trim() || undefined,
         phone: formData.phone.trim(),
@@ -57,8 +57,11 @@ export const EventsPage: React.FC = () => {
         seatingArrangement: formData.seatingArrangement
       });
       setSubmittedInquiry(created);
+    } catch (err) {
+      console.error('Event inquiry submission error:', err);
+    } finally {
       setSubmitting(false);
-    }, 600);
+    }
   };
 
   return (

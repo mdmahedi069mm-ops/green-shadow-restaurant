@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Customer food order details and fulfillment timeline",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "customerEmail": { "type": "string", "maxLength": 100 },
+        "orderType": { "type": "string", "enum": ["delivery", "pickup", "dine-in"] },
+        "status": {
+          "type": "string",
+          "enum": ["placed", "confirmed", "preparing", "out_for_delivery", "ready_for_pickup", "delivered", "completed", "cancelled"]
+        },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "vatFee": { "type": "number" },
+        "tipAmount": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "couponCode": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "customerName", "customerPhone", "orderType", "status", "totalAmount"]
+    },
+    "Reservation": {
+      "title": "Reservation",
+      "description": "Table booking at The Green Shadow Restaurant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 100 },
+        "guests": { "type": "number" },
+        "date": { "type": "string", "maxLength": 30 },
+        "time": { "type": "string", "maxLength": 30 },
+        "seatingPreference": { "type": "string", "maxLength": 50 },
+        "occasionType": { "type": "string", "maxLength": 50 },
+        "specialRequest": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"] },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "phone", "guests", "date", "time", "status"]
+    },
+    "EventInquiry": {
+      "title": "EventInquiry",
+      "description": "Corporate AGM, Walima, Banquet or Conference hall booking inquiry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "organization": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 100 },
+        "eventType": { "type": "string", "maxLength": 50 },
+        "guests": { "type": "number" },
+        "eventDate": { "type": "string", "maxLength": 30 },
+        "preferredTime": { "type": "string", "maxLength": 30 },
+        "requirements": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"] },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "phone", "eventType", "guests", "eventDate", "status"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Menu dish and inventory status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "categoryId": { "type": "string", "maxLength": 50 },
+        "nameEn": { "type": "string", "maxLength": 100 },
+        "nameBn": { "type": "string", "maxLength": 100 },
+        "price": { "type": "number" },
+        "isAvailable": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "isPopular": { "type": "boolean" }
+      },
+      "required": ["id", "categoryId", "nameEn", "price", "isAvailable"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders placed by customers and tracked by kitchen"
+    },
+    "/reservations/{reservationId}": {
+      "schema": "Reservation",
+      "description": "Table reservations submitted by guests"
+    },
+    "/eventInquiries/{inquiryId}": {
+      "schema": "EventInquiry",
+      "description": "Private event and conference hall inquiries"
+    },
+    "/menuItems/{itemId}": {
+      "schema": "MenuItem",
+      "description": "Live menu dishes and real-time inventory availability"
+    }
+  }
+}
